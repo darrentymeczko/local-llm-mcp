@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 from typing import Any
 
 import httpx
@@ -20,7 +21,10 @@ TOOL_DESCRIPTION = (
     "stubs. NOT suitable for: anything requiring deep reasoning about this specific "
     "codebase, multi-step planning, ambiguous requirements, or tasks where correctness "
     "is hard to verify quickly. The local model has less capability than you do -- "
-    "always be prepared to review and correct its output rather than trusting it blindly."
+    "always be prepared to review and correct its output rather than trusting it blindly. "
+    "Pass output_path to have the generated text written straight to a new file instead "
+    "of returned to you; this keeps large output out of your context, but you then have "
+    "not seen it, so read or test the file before relying on it."
 )
 
 mcp = MCPServer("local-llm")
@@ -46,9 +50,37 @@ def _timeout() -> float:
         return DEFAULT_TIMEOUT
 
 
+def _write_output(output_path: str, content: str) -> str:
+    """Write generated text to a new file, returning a summary instead of the text."""
+    path = pathlib.Path(output_path).expanduser()
+    if path.exists():
+        return (
+            f"Refusing to overwrite the existing file {path}. Delegated output is "
+            "unreviewed, so this tool only creates new files. Choose another path, or "
+            "delete the file yourself first if replacing it is what you intend."
+        )
+    if not path.parent.is_dir():
+        return f"Cannot write to {path}: the directory {path.parent} does not exist."
+    try:
+        path.write_text(content, encoding="utf-8")
+    except OSError as exc:
+        return f"Cannot write to {path}: {exc}"
+    return (
+        f"Wrote {len(content)} characters ({content.count(chr(10)) + 1} lines) to {path}. "
+        "The content was not returned, so you have not seen it. Read the file, or run "
+        "its tests, before relying on it."
+    )
+
+
 @mcp.tool(name="delegate_to_local", description=TOOL_DESCRIPTION)
-def delegate_to_local(prompt: str, system_prompt: str = "") -> str:
-    """Send `prompt` (optionally preceded by `system_prompt`) to the local model."""
+def delegate_to_local(
+    prompt: str, system_prompt: str = "", output_path: str = ""
+) -> str:
+    """Send `prompt` (optionally preceded by `system_prompt`) to the local model.
+
+    With `output_path`, the reply is written to that new file and only a summary
+    is returned, keeping large generated output out of the caller's context.
+    """
     endpoint = _endpoint()
     messages: list[dict[str, str]] = []
     if system_prompt:
@@ -95,7 +127,11 @@ def delegate_to_local(prompt: str, system_prompt: str = "") -> str:
             "Local model returned an empty response. It may have spent its output "
             "budget on reasoning tokens -- try lowering its reasoning effort."
         )
-    return str(content)
+
+    text = str(content)
+    if output_path:
+        return _write_output(output_path, text)
+    return text
 
 
 def main() -> None:

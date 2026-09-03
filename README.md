@@ -126,12 +126,38 @@ Useful for confirming the endpoint and model id are right before you blame Claud
 
 ## The tool
 
-`delegate_to_local(prompt: str, system_prompt: str = "") -> str`
+`delegate_to_local(prompt: str, system_prompt: str = "", output_path: str = "") -> str`
 
 `prompt` is sent as the user message; `system_prompt`, if given, precedes it as a
 system message. The tool returns the generated text only. Failures come back as
 readable messages rather than exceptions: server not running, timeout, non-200
 response body, or an unexpected response shape.
+
+### output_path, and why it is the only real saving
+
+With `output_path`, the reply is written to that file and Claude gets back a one-line
+summary instead of the text.
+
+This is not a convenience - it is the difference between the tool saving anything and
+not. Without it, generated content still has to pass through Claude's *output* tokens
+to reach disk, and output is the expensive direction. Delegation then removes only the
+thinking, which for rote work was never the costly part. Measured on a three-function
+docstring task, delegating cost about the same as Claude simply doing it. With
+`output_path`, the generated text never enters Claude's context at all.
+
+The tradeoff is real: nobody has read the output. Only use it where verification is
+cheap and mechanical - a test suite, a type checker, a linter, or a spot-check of a
+few files out of many. If the only way to verify is to read every line, delegation
+saves nothing, because reading costs about what writing does.
+
+Guard rails:
+
+- **It never overwrites.** An existing path is refused, since the content is
+  unreviewed. Delete the file yourself first if replacing it is what you mean.
+- **It never creates directories.** A missing parent is an error.
+- **Failures write nothing.** A server that is down or times out leaves no file behind.
+- Writes are UTF-8. Run the non-ASCII scan below before committing generated files;
+  local models slip typographic punctuation into code comments.
 
 ## Known limitations
 
