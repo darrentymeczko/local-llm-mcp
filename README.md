@@ -120,8 +120,18 @@ response body, or an unexpected response shape.
   effort on the *server* side (e.g. llama.cpp's `--chat-template-kwargs`
   `{"reasoning_effort":"low"}`) rather than raising the timeout here.
 - **No streaming, no conversation state.** Each call is a single independent
-  request/response. There is no session, no file access, no tool use on the local side  - 
+  request/response. There is no session, no file access, no tool use on the local side -
   the local model sees only the prompt text Claude sends it.
+- **Watch for non-ASCII characters.** Local models like to reach for typographic
+  punctuation - non-breaking hyphens (U+2011), en dashes (U+2013), curly quotes -
+  especially in prose like docstrings and comments. Python does not care, but they
+  break `grep`, produce confusing diffs, and can blow up on tools that assume ASCII.
+  Scan delegated output before you commit it:
+
+  ```bash
+  python -c "import sys,unicodedata; [print(f'U+{ord(c):04X} {unicodedata.name(c,chr(63))}') for c in open(sys.argv[1],encoding='utf-8').read() if ord(c)>127]" FILE
+  ```
+
 - **No retries.** A failed call returns an error string; Claude decides whether to
   retry or just do the task itself.
 
