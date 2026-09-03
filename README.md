@@ -183,6 +183,16 @@ Guard rails:
   python -c "import sys,unicodedata; [print(f'U+{ord(c):04X} {unicodedata.name(c,chr(63))}') for c in open(sys.argv[1],encoding='utf-8').read() if ord(c)>127]" FILE
   ```
 
+- **There is a throughput ceiling, and it bites before the timeout does.** A local
+  model cannot emit an arbitrarily long file inside the request window. Asking a 20B
+  model at low reasoning effort for a ~350-line module timed out at 60s; so did a
+  half-sized request, while a one-token probe returned instantly - throughput, not
+  availability. Raising the timeout is the wrong fix, because an oversized call
+  returns *nothing*, not partial output, so you pay the full wait for zero result.
+  Split large jobs into chunks of roughly 100-150 lines and issue them in parallel.
+  Chunking has its own cost: per-chunk prompts drift from the spec (terse docstrings
+  where full ones were asked for), and assembling the pieces is work the caller has
+  to do and verify.
 - **No retries.** A failed call returns an error string; Claude decides whether to
   retry or just do the task itself.
 

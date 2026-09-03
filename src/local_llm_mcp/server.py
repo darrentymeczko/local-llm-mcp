@@ -24,7 +24,11 @@ TOOL_DESCRIPTION = (
     "always be prepared to review and correct its output rather than trusting it blindly. "
     "Pass output_path to have the generated text written straight to a new file instead "
     "of returned to you; this keeps large output out of your context, but you then have "
-    "not seen it, so read or test the file before relying on it."
+    "not seen it, so read or test the file before relying on it. "
+    "Size each call to what the local model can emit inside the timeout -- roughly "
+    "100-150 lines for a small model. An oversized request times out and returns "
+    "nothing rather than partial output, so split large jobs into several parallel "
+    "calls instead of one big one."
 )
 
 mcp = MCPServer("local-llm")
