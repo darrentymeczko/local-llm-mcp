@@ -53,6 +53,7 @@ All machine-specific details are environment variables:
 | `LOCAL_LLM_ENDPOINT` | `http://localhost:8081/v1/chat/completions` | Full chat-completions URL of your local server |
 | `LOCAL_LLM_MODEL` | `lmstudio-community/gpt-oss-20b-GGUF:MXFP4` | Model id sent in the request body |
 | `LOCAL_LLM_TIMEOUT` | `60` | Request timeout in seconds |
+| `LOCAL_LLM_START_HINT` | unset | Command that starts your local server, shown to Claude when the server is down |
 
 Common endpoints: llama.cpp `http://localhost:8080/v1/chat/completions`,
 Ollama `http://localhost:11434/v1/chat/completions`,
@@ -60,6 +61,30 @@ LM Studio `http://localhost:1234/v1/chat/completions`.
 
 Many local servers ignore the `model` field and serve whatever is loaded; set it
 anyway if your server routes on it.
+
+### Letting Claude start your server
+
+Forgetting to start the local server is the most common way delegation fails. Set
+`LOCAL_LLM_START_HINT` to the command that starts yours, and the "server is not
+running" error will carry it:
+
+```
+Local model server is not running at http://localhost:8081/v1/chat/completions.
+Start it before delegating tasks.
+The user configured this command to start it:
+    llama-server -m models/gpt-oss-20b.gguf --port 8081
+Offer to run it for them -- do not run it silently.
+```
+
+Claude can then offer to run it with its own shell tool, which prompts you for
+permission first. This server never spawns processes itself - deliberately. Doing so
+would mean owning a multi-gigabyte child process across session restarts, racing other
+sessions for the port, and swallowing model load times that far exceed the request
+timeout. Handing Claude a suggestion you approve keeps the utility small and leaves
+the decision with you.
+
+The hint is only ever text in an error message. Treat it as a suggestion requiring
+your approval, not something to execute automatically.
 
 ## Register with Claude Code
 

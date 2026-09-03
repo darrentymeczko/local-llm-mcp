@@ -34,6 +34,11 @@ def _model() -> str:
     return os.environ.get("LOCAL_LLM_MODEL", DEFAULT_MODEL)
 
 
+def _start_hint() -> str:
+    """Command the user configured for starting their local server, if any."""
+    return os.environ.get("LOCAL_LLM_START_HINT", "").strip()
+
+
 def _timeout() -> float:
     try:
         return float(os.environ.get("LOCAL_LLM_TIMEOUT", DEFAULT_TIMEOUT))
@@ -55,10 +60,17 @@ def delegate_to_local(prompt: str, system_prompt: str = "") -> str:
     try:
         response = httpx.post(endpoint, json=payload, timeout=_timeout())
     except httpx.ConnectError:
-        return (
+        message = (
             f"Local model server is not running at {endpoint}. "
             "Start it before delegating tasks."
         )
+        hint = _start_hint()
+        if hint:
+            message += (
+                f"\nThe user configured this command to start it:\n    {hint}\n"
+                "Offer to run it for them -- do not run it silently."
+            )
+        return message
     except httpx.TimeoutException:
         return (
             f"Local model request timed out after {_timeout():g}s at {endpoint}. "
